@@ -116,13 +116,12 @@ export const useGloballySavedState = (
   }, []);
 
   useEffect(() => {
-    requestIdleCallback(() => {
-      if (!shouldSetNewLocalStorageValue) return;
-      localStorage.setItem("state", debugString);
-      toast({
-        title: "Saved current state",
-      });
+    if (!shouldSetNewLocalStorageValue) return;
+    localStorage.setItem("state", debugString);
+    toast({
+      title: "Saved current state",
     });
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debugString]);
 
