@@ -24,6 +24,9 @@ import { makeBalances } from "./lib/makeBalances";
 import { useGloballySavedState } from "./lib/useGloballySavedState";
 import { useToast } from "./components/ui/use-toast";
 import { Toaster } from "./components/ui/toaster";
+import { Introduction } from "./components/Introduction";
+import { Checkbox } from "./components/ui/checkbox";
+import { Debug } from "./components/Debug";
 
 const Panel = twc.div`rounded-md border shadow p-4 bg-gray-50`;
 
@@ -39,6 +42,8 @@ function App() {
   const [lookaheadDays, setLookaheadDays] = useState(365);
   const [daysPerAggregationPeriod, setDaysPerAggregationPeriod] = useState(14);
   const [aggregationAmount, setAggregationAmount] = useState(0.808);
+
+  const [showDebug, setShowDebug] = useState(false);
 
   const { toast } = useToast();
 
@@ -85,7 +90,6 @@ function App() {
       aggregationAmount,
     },
     (state) => {
-      console.log("asdf");
       state.checkpointDate &&
         setCheckpointDate(new Date(state.checkpointDate as string));
       state.checkpointAmount &&
@@ -102,22 +106,7 @@ function App() {
 
   return (
     <div className="p-8 sm:p-12 flex flex-col gap-y-8 max-w-screen-xl">
-      <div className="prose leading-snug">
-        <h1>PTO Calculator</h1>
-        <p>
-          Workday is potentially the worst possible interface for visualizing
-          your vacation days. Here's a better one.
-        </p>
-        <p>Here's how it works:</p>
-        <ul>
-          <li>
-            Enter the date when you last accrued PTO and the amount of PTO you
-            had on that day.
-          </li>
-          <li>Click on the calendar to mark days off.</li>
-          <li>Hover over the chart to see your balance on any given day.</li>
-        </ul>
-      </div>
+      <Introduction />
       <Panel className="flex flex-col gap-8 sm:flex-row sm:gap-12">
         <FormFieldSet>
           <Label htmlFor="startcount">Checkpoint PTO Balance</Label>
@@ -131,7 +120,8 @@ function App() {
           <DatePicker date={checkpointDate} setDate={setCheckpointDate} />
         </FormFieldSet>
       </Panel>
-      <Panel className="max-h-[60vh] overflow-auto flex flex-col sm:flex-row gap-4 items-center">
+
+      <Panel className="max-h-[50vh] overflow-auto flex flex-col sm:flex-row gap-4 items-center">
         <Calendar
           mode="single"
           month={checkpointDate}
@@ -140,11 +130,15 @@ function App() {
           showOutsideDays={false}
           modifiers={{
             checkpoint: checkpointDate ? [checkpointDate] : [],
+            // editingNotes: editingNotesForDay ? [editingNotesForDay] : [],
+            // hasNotes: Object.keys(vacationNotes).map((s) => new Date(s)),
             vacation: Array.from(vacationDays.values()),
             aggregation: aggregationDays,
           }}
           modifiersClassNames={{
+            // editingNotes: "border-2 border-blue-400",
             checkpoint: "border-2 border-gray-900",
+            // hasNotes: "border-2 border-yellow-400",
             vacation: "!bg-green-200 !hover:bg-green-800 text-green-800",
             aggregation:
               "bg-red-200 border-2 border-red-200 text-accent-foreground",
@@ -167,6 +161,13 @@ function App() {
           lookaheadDays={lookaheadDays}
         />
       </Panel>
+      {showDebug && (
+        <Panel>
+          <Debug value={vacationDays} label="Vacation Days" />
+          <Debug value={deltas} label="Deltas" />
+          <Debug value={balances} label="Balances" />
+        </Panel>
+      )}
       <Sheet>
         <div className="w-full flex justify-between">
           <p className="prose">
@@ -222,6 +223,16 @@ function App() {
                 >
                   Copy to Clipboard
                 </Button>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="showDebug"
+                    checked={showDebug}
+                    onClick={() => {
+                      setShowDebug(!showDebug);
+                    }}
+                  />
+                  <Label htmlFor="showDebug">Show Debug Info</Label>
+                </div>
                 <Button
                   variant="destructive"
                   className="mt-8 justify-self-end"
