@@ -1,256 +1,275 @@
-import { useMemo, useState } from "react";
-import { Calendar } from "@/components/ui/calendar";
-
+import {
+  Dispatch,
+  memo,
+  SetStateAction,
+  useDeferredValue,
+  useEffect,
+} from "react";
+import { NumericInput } from "./components/NumericInput";
+import { useSavedState } from "./lib/useGloballySavedState";
+import { DatePicker } from "./components/DatePicker";
+import { Calendar } from "./components/ui/calendar";
+import { Delta, makeDeltas } from "./lib/makeDeltas";
+import { makeAggregationDays } from "./lib/makeAggregationDays";
+import { makeBalances } from "./lib/makeBalances";
+import { Chart } from "./components/Chart";
+import { Card, CardContent } from "./components/ui/card";
+import { Label } from "./components/ui/label";
+import { Button } from "./components/ui/button";
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
   SheetTrigger,
-} from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-
-import { firstFridayOfMonth } from "./lib/utils";
-import { Textarea } from "./components/ui/textarea";
+} from "./components/ui/sheet";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { twc } from "react-twc";
-import { Chart } from "./components/Chart";
-import { DatePicker } from "./components/DatePicker";
-import { useDateSet } from "./lib/useDateSet";
-import { NumericInput } from "./components/NumericInput";
-import { makeAggregationDays } from "./lib/makeAggregationDays";
-import { makeDeltas } from "./lib/makeDeltas";
-import { makeBalances } from "./lib/makeBalances";
-import { useGloballySavedState } from "./lib/useGloballySavedState";
-import { useToast } from "./components/ui/use-toast";
-import { Toaster } from "./components/ui/toaster";
-import { Introduction } from "./components/Introduction";
-import { Checkbox } from "./components/ui/checkbox";
-import { Debug } from "./components/Debug";
 
-const Panel = twc.div`rounded-md border shadow p-4 bg-gray-50`;
+declare global {
+  interface Window {
+    setTheme: () => void;
+  }
+}
 
 const FormFieldSet = twc.div`flex flex-col items-start gap-1.5`;
 
-function App() {
-  const [checkpointDate, setCheckpointDate] = useState(
-    firstFridayOfMonth(new Date())
-  );
-  const [checkpointAmount, setCheckpointAmount] = useState(12);
-  const [vacationDays, toggleVacationDay, setVacationDays] = useDateSet();
-
-  const [lookaheadDays, setLookaheadDays] = useState(365);
-  const [daysPerAggregationPeriod, setDaysPerAggregationPeriod] = useState(14);
-  const [aggregationAmount, setAggregationAmount] = useState(0.808);
-
-  const [showDebug, setShowDebug] = useState(false);
-
-  const { toast } = useToast();
-
-  const aggregationDays = useMemo(
-    () =>
-      makeAggregationDays(
-        lookaheadDays,
-        daysPerAggregationPeriod,
-        checkpointDate
-      ),
-    [checkpointDate, daysPerAggregationPeriod, lookaheadDays]
+const App = () => {
+  const [checkpointDate, setCheckpointDate] = useSavedState(
+    "checkpointDate",
+    new Date(),
+    str => new Date(JSON.parse(str))
   );
 
-  const deltas = useMemo(
-    () =>
-      makeDeltas(
-        lookaheadDays,
-        checkpointDate,
-        vacationDays,
-        aggregationDays,
-        aggregationAmount
-      ),
-    [
-      aggregationAmount,
-      aggregationDays,
-      checkpointDate,
-      lookaheadDays,
-      vacationDays,
-    ]
+  const [checkpointAmount, setCheckpointAmount] = useSavedState(
+    "checkpointAmount",
+    12
   );
 
-  const balances = useMemo(
-    () => makeBalances(checkpointAmount, deltas),
-    [deltas, checkpointAmount]
+  const [ptoDays, setPtoDays] = useSavedState<Date[]>("ptoDays", [], str =>
+    (JSON.parse(str) as string[]).map(value => new Date(value))
   );
 
-  const [debugString, parseDebugString] = useGloballySavedState(
-    {
-      checkpointDate,
-      checkpointAmount,
-      vacationDays,
-      lookaheadDays,
-      daysPerAggregationPeriod,
-      aggregationAmount,
-    },
-    (state) => {
-      state.checkpointDate &&
-        setCheckpointDate(new Date(state.checkpointDate as string));
-      state.checkpointAmount &&
-        setCheckpointAmount(state.checkpointAmount as number);
-      state.vacationDays && setVacationDays(state.vacationDays as Date[]);
-      state.lookaheadDays && setLookaheadDays(state.lookaheadDays as number);
-      state.daysPerAggregationPeriod &&
-        setDaysPerAggregationPeriod(state.daysPerAggregationPeriod as number);
-      state.aggregationAmount &&
-        setAggregationAmount(state.aggregationAmount as number);
-    },
-    toast
+  const [lookaheadDays, setLookaheadDays] = useSavedState("lookaheadDays", 500);
+  const [daysPerAggregationPeriod, setDaysPerAggregationPeriod] = useSavedState(
+    "daysPerAggregationPeriod",
+    14
   );
+  const [aggregationAmount, setAggregationAmount] = useSavedState(
+    "aggregationAmount",
+    0.808
+  );
+
+  const deferredPtoDays = useDeferredValue(ptoDays);
+
+  const [theme, setTheme] = useSavedState("theme", "auto", s => s);
+
+  useEffect(() => {
+    window.setTheme();
+  }, [theme]);
 
   return (
     <div className="p-8 sm:p-12 flex flex-col gap-y-8 max-w-screen-xl">
-      <Introduction />
-      <Panel className="flex flex-col gap-8 sm:flex-row sm:gap-12">
-        <FormFieldSet>
-          <Label htmlFor="startcount">Checkpoint PTO Balance</Label>
-          <NumericInput
-            number={checkpointAmount}
-            onChange={setCheckpointAmount}
+      <div className="prose leading-snug dark:prose-invert">
+        <div className="flex w-full justify-between items-center mb-8">
+          <h1 className="mb-0">PTO Calculator</h1>
+          <Select value={theme} onValueChange={setTheme}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Theme" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="light">Light</SelectItem>
+              <SelectItem value="dark">Dark</SelectItem>
+              <SelectItem value="auto">System</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <p>
+          This tool helps you keep track of your balance of paid time off over
+          the course of a long period of time. It's designed to work with the
+          way my company does PTO, but it might work for yours, too.
+        </p>
+        <p>Here's how this tool works:</p>
+        <ul>
+          <li>
+            Enter the date when you last accrued PTO and the amount of PTO you
+            had on that day.
+          </li>
+          <li>Click on the calendar to mark days off.</li>
+          <li>Hover over the chart to see your balance on any given day.</li>
+        </ul>
+        <p>
+          Everything you enter will be saved to your browser's local storage.
+        </p>
+      </div>
+      <Card>
+        <CardContent className="pt-4">
+          <div className="flex gap-8">
+            <div className="flex gap-8 flex-col">
+              <FormFieldSet>
+                <Label>Checkpoint PTO Balance</Label>
+                <NumericInput
+                  number={checkpointAmount}
+                  onChange={setCheckpointAmount}
+                />
+              </FormFieldSet>
+              <FormFieldSet>
+                <Label>Checkpoint PTO Date</Label>
+                <DatePicker date={checkpointDate} setDate={setCheckpointDate} />
+              </FormFieldSet>
+            </div>
+            <Calendar
+              mode="multiple"
+              numberOfMonths={3}
+              selected={ptoDays}
+              onSelect={days => setPtoDays(days || [])}
+              className="rounded-md border"
+              modifiers={{ checkpoint: checkpointDate ? [checkpointDate] : [] }}
+              modifiersClassNames={{
+                checkpoint: "border-2 border-gray-900",
+                selected: "!bg-green-200 !hover:bg-green-800 text-green-800 ",
+              }}
+            />
+          </div>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardContent className="pt-4">
+          <Deltas
+            checkpointDate={checkpointDate}
+            checkpointAmount={checkpointAmount}
+            ptoDays={deferredPtoDays}
+            lookaheadDays={lookaheadDays}
+            daysPerAggregationPeriod={daysPerAggregationPeriod}
+            aggregationAmount={aggregationAmount}
           />
-        </FormFieldSet>
-        <FormFieldSet>
-          <Label>Checkpoint Date</Label>
-          <DatePicker date={checkpointDate} setDate={setCheckpointDate} />
-        </FormFieldSet>
-      </Panel>
+        </CardContent>
+      </Card>
+      <Settings
+        lookaheadDays={lookaheadDays}
+        daysPerAggregationPeriod={daysPerAggregationPeriod}
+        aggregationAmount={aggregationAmount}
+        setLookaheadDays={setLookaheadDays}
+        setDaysPerAggregationPeriod={setDaysPerAggregationPeriod}
+        setAggregationAmount={setAggregationAmount}>
+        <p className="prose dark:prose-invert">
+          Made by <a href="https://jameslittle.me">James Little</a>
+        </p>
+      </Settings>
+    </div>
+  );
+};
 
-      <Panel className="max-h-[50vh] overflow-auto flex flex-col sm:flex-row gap-4 items-center">
-        <Calendar
-          mode="single"
-          month={checkpointDate}
-          numberOfMonths={lookaheadDays / 30}
-          disableNavigation
-          showOutsideDays={false}
-          modifiers={{
-            checkpoint: checkpointDate ? [checkpointDate] : [],
-            // editingNotes: editingNotesForDay ? [editingNotesForDay] : [],
-            // hasNotes: Object.keys(vacationNotes).map((s) => new Date(s)),
-            vacation: Array.from(vacationDays.values()),
-            aggregation: aggregationDays,
-          }}
-          modifiersClassNames={{
-            // editingNotes: "border-2 border-blue-400",
-            checkpoint: "border-2 border-gray-900",
-            // hasNotes: "border-2 border-yellow-400",
-            vacation: "!bg-green-200 !hover:bg-green-800 text-green-800",
-            aggregation:
-              "bg-red-200 border-2 border-red-200 text-accent-foreground",
-          }}
-          onDayClick={(day: Date) => toggleVacationDay(day)}
-        />
-        <Button
-          className="m-4"
-          onClick={() => {
-            setLookaheadDays(lookaheadDays + 30);
-          }}
-        >
-          Add another month
-        </Button>
-      </Panel>
-      <Panel className="h-[30vh] w-full">
-        <Chart
-          balances={balances}
-          checkpointDate={checkpointDate}
-          lookaheadDays={lookaheadDays}
-        />
-      </Panel>
-      {showDebug && (
-        <Panel>
-          <Debug value={vacationDays} label="Vacation Days" />
-          <Debug value={deltas} label="Deltas" />
-          <Debug value={balances} label="Balances" />
-        </Panel>
-      )}
+const Deltas = memo(
+  ({
+    checkpointDate,
+    checkpointAmount,
+    ptoDays,
+
+    lookaheadDays,
+    daysPerAggregationPeriod,
+    aggregationAmount,
+  }: {
+    checkpointDate: Date;
+    checkpointAmount: number;
+    ptoDays: Date[];
+
+    lookaheadDays: number;
+    daysPerAggregationPeriod: number;
+    aggregationAmount: number;
+  }) => {
+    const aggregationDays = makeAggregationDays(
+      lookaheadDays,
+      daysPerAggregationPeriod,
+      checkpointDate
+    );
+    const deltas: Delta[] = makeDeltas(
+      lookaheadDays,
+      checkpointDate,
+      ptoDays,
+      aggregationDays,
+      aggregationAmount
+    );
+    const balances = makeBalances(checkpointAmount, deltas);
+    return <Chart balances={balances} />;
+  }
+);
+
+const Settings = memo(
+  ({
+    lookaheadDays,
+    setLookaheadDays,
+    daysPerAggregationPeriod,
+    setDaysPerAggregationPeriod,
+    aggregationAmount,
+    setAggregationAmount,
+    children,
+  }: {
+    lookaheadDays: number;
+    setLookaheadDays: Dispatch<SetStateAction<number>>;
+    daysPerAggregationPeriod: number;
+    setDaysPerAggregationPeriod: Dispatch<SetStateAction<number>>;
+    aggregationAmount: number;
+    setAggregationAmount: Dispatch<SetStateAction<number>>;
+    children: any;
+  }) => {
+    return (
       <Sheet>
         <div className="w-full flex justify-between">
-          <p className="prose">
-            Made by <a href="https://jameslittle.me">James Little</a>
-          </p>
+          {children}
           <Button asChild>
             <SheetTrigger>Nitpicky Settings</SheetTrigger>
           </Button>
-        </div>
-        <SheetContent>
-          <SheetHeader>
-            <SheetTitle>Nitpicky Settings</SheetTitle>
-            <>
-              <div className="flex flex-col gap-y-4">
-                <FormFieldSet>
-                  <Label>Lookahead Days</Label>
-                  <NumericInput
-                    number={lookaheadDays}
-                    onChange={setLookaheadDays}
-                  />
-                </FormFieldSet>
-                <FormFieldSet>
-                  <Label>Days per Aggregation Period</Label>
-                  <NumericInput
-                    number={daysPerAggregationPeriod}
-                    onChange={setDaysPerAggregationPeriod}
-                  />
-                </FormFieldSet>
-                <FormFieldSet>
-                  <Label>Aggregation Amount</Label>
-                  <NumericInput
-                    number={aggregationAmount}
-                    onChange={setAggregationAmount}
-                  />
-                </FormFieldSet>
-                <FormFieldSet>
-                  <Label>Raw Data</Label>
-                  <Textarea
-                    className="font-mono"
-                    value={debugString}
-                    onChange={(e) => {
-                      parseDebugString(e.target.value);
-                    }}
-                  />
-                </FormFieldSet>
-                <Button
-                  onClick={() => {
-                    navigator.clipboard.writeText(debugString);
-                    toast({
-                      title: "Copied to clipboard",
-                    });
-                  }}
-                >
-                  Copy to Clipboard
-                </Button>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="showDebug"
-                    checked={showDebug}
+          <SheetContent>
+            <SheetHeader>
+              <SheetTitle>Nitpicky Settings</SheetTitle>
+              <>
+                <div className="flex flex-col gap-y-4">
+                  <FormFieldSet>
+                    <Label>Lookahead Days</Label>
+                    <NumericInput
+                      number={lookaheadDays}
+                      onChange={setLookaheadDays}
+                    />
+                  </FormFieldSet>
+                  <FormFieldSet>
+                    <Label>Days per Aggregation Period</Label>
+                    <NumericInput
+                      number={daysPerAggregationPeriod}
+                      onChange={setDaysPerAggregationPeriod}
+                    />
+                  </FormFieldSet>
+                  <FormFieldSet>
+                    <Label>Aggregation Amount</Label>
+                    <NumericInput
+                      number={aggregationAmount}
+                      onChange={setAggregationAmount}
+                    />
+                  </FormFieldSet>
+
+                  <Button
+                    variant="destructive"
+                    className="mt-8 justify-self-end"
                     onClick={() => {
-                      setShowDebug(!showDebug);
-                    }}
-                  />
-                  <Label htmlFor="showDebug">Show Debug Info</Label>
+                      localStorage.clear();
+                      window.location.reload();
+                    }}>
+                    Clear Saved Data
+                  </Button>
                 </div>
-                <Button
-                  variant="destructive"
-                  className="mt-8 justify-self-end"
-                  onClick={() => {
-                    localStorage.clear();
-                    window.location.reload();
-                  }}
-                >
-                  Clear Saved Data
-                </Button>
-              </div>
-            </>
-          </SheetHeader>
-        </SheetContent>
+              </>
+            </SheetHeader>
+          </SheetContent>
+        </div>
       </Sheet>
-      <Toaster />
-    </div>
-  );
-}
+    );
+  }
+);
 
 export default App;

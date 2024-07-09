@@ -10,18 +10,18 @@ export type Delta = {
 export const makeDeltas = (
   lookaheadDays: number,
   checkpointDate: Date,
-  vacationDays: Date[],
+  ptoDays: Date[],
   aggregationDays: Date[],
   aggregationAmount: number
 ) =>
-  range(lookaheadDays).map((dayOffset) => {
+  range(lookaheadDays).map(dayOffset => {
     const date = addDays(checkpointDate, dayOffset);
     const dateValue = dateToShortString(date);
 
     const isAggregationDay = aggregationDays
       .map(dateToShortString)
       .includes(dateValue);
-    const isDayOff = vacationDays.map(dateToShortString).includes(dateValue);
+    const isDayOff = ptoDays.map(dateToShortString).includes(dateValue);
 
     let delta = 0;
     if (isAggregationDay) delta += aggregationAmount;
